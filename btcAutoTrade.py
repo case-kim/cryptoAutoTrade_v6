@@ -1,11 +1,9 @@
 import time
 import pyupbit
 import datetime
-import schedule
-from fbprophet import Prophet
 
-access = "your-access"
-secret = "your-secret"
+access = "2D752yj7OcgxKAxLPVjBlBSwLjAPm9zXnPtActFG"
+secret = "ELxxKebkgugFQxspWSj7rSzGexAelmT6x18dCm64"
 
 def get_target_price(ticker, k):
     """변동성 돌파 전략으로 매수 목표가 조회"""
@@ -28,32 +26,10 @@ def get_balance(ticker):
                 return float(b['balance'])
             else:
                 return 0
-    return 0
 
 def get_current_price(ticker):
     """현재가 조회"""
     return pyupbit.get_orderbook(tickers=ticker)[0]["orderbook_units"][0]["ask_price"]
-
-predicted_close_price = 0
-def predict_price(ticker):
-    """Prophet으로 당일 종가 가격 예측"""
-    global predicted_close_price
-    df = pyupbit.get_ohlcv(ticker, interval="minute60")
-    df = df.reset_index()
-    df['ds'] = df['index']
-    df['y'] = df['close']
-    data = df[['ds','y']]
-    model = Prophet()
-    model.fit(data)
-    future = model.make_future_dataframe(periods=24, freq='H')
-    forecast = model.predict(future)
-    closeDf = forecast[forecast['ds'] == forecast.iloc[-1]['ds'].replace(hour=9)]
-    if len(closeDf) == 0:
-        closeDf = forecast[forecast['ds'] == data.iloc[-1]['ds'].replace(hour=9)]
-    closeValue = closeDf['yhat'].values[0]
-    predicted_close_price = closeValue
-predict_price("KRW-BTC")
-schedule.every().hour.do(lambda: predict_price("KRW-BTC"))
 
 # 로그인
 upbit = pyupbit.Upbit(access, secret)
@@ -63,14 +39,14 @@ print("autotrade start")
 while True:
     try:
         now = datetime.datetime.now()
-        start_time = get_start_time("KRW-BTC")
-        end_time = start_time + datetime.timedelta(days=1)
-        schedule.run_pending()
+        start_time = get_start_time("KRW-BTC") #9:00
+        end_time = start_time + datetime.timedelta(days=1) #9:00 + 1일
 
+        # 9:00 < 현재 < #8:59:50
         if start_time < now < end_time - datetime.timedelta(seconds=10):
-            target_price = get_target_price("KRW-BTC", 0.2)
-            current_price = get_current_price("KRW-BTC")
-            if target_price < current_price and current_price < predicted_close_price:
+            target_price_btc = get_target_price("KRW-BTC", 0.2)
+            current_price_btc = get_current_price("KRW-BTC")
+            if target_price_btc < current_price_btc:
                 krw = get_balance("KRW")
                 if krw > 5000:
                     upbit.buy_market_order("KRW-BTC", krw*0.9995)
